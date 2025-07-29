@@ -458,52 +458,110 @@ plot_diversity_comparison <- function(tair_code, gene_name, time_h, raw_df, data
   aesthetics <- get_plot_aesthetics(dataset)
   time_map <- if (regex$pattern_type == "mapped") get_time_mapping() else NULL
 
+diversity_summary_df <- raw_df %>%
+  tibble::rownames_to_column(var = "transcript_id") %>%
+  dplyr::filter(str_starts(transcript_id, tair_code)) %>%
+  pivot_longer(
+    cols = -transcript_id,
+    names_to = "sample",
+    values_to = "abundance"
+  ) %>%
+  mutate(
+    condition_group = str_extract(sample, regex$condition_group),
+    time_h_calc = extract_time(sample, regex, time_map) # Assumes extract_time() is a custom function
+  ) %>%
+  dplyr::filter(time_h_calc == !!time_h) %>%
+  # Pool Replicates 
+  # Group by condition and transcript to average the replicates
+  group_by(condition_group, transcript_id) %>%
+  summarise(
+    mean_abundance = mean(abundance, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(mean_abundance > 0) %>%
+  group_by(condition_group) %>%
+  # Calculate values needed for proportions (P)
+  mutate(
+    # N is the total abundance for the entire condition group
+    N = sum(mean_abundance),
+    # P is the proportion of each transcript within its group
+    P = mean_abundance / N
+  ) %>%
+  # Calculate the components for the Shannon Index (H) and its variance
+  mutate(
+    P_lnP = P * log(P),
+    P_lnP_sq = P * (log(P))^2
+  ) %>%
+  # Summarise Each Group for Final Test Statistics
+  summarise(
+    # Richness (S) is the count of unique transcripts in the group
+    Richness = n(),
+    # N is constant within the group, so we can take the mean (or first value)
+    N = mean(N, na.rm = TRUE),
+    # Calculate the Shannon Index (H)
+    H = -sum(P_lnP),
+    # Sum the squared term needed for variance calculation
+    sum_P_lnP_sq = sum(P_lnP_sq),
+    .groups = "drop"
+  ) %>%
+  # Calculate the Variance of H 
+  mutate(
+    Var_H = ((sum_P_lnP_sq - (H^2)) / N) + ((Richness - 1) / (2 * N^2))
+  ) %>%
+  select(condition_group, Richness, N, H, Var_H)
 
-  sdi_replicates <- raw_df %>%
-    tibble::rownames_to_column(var = "gene") %>%
-    dplyr::filter(str_starts(gene, tair_code)) %>%
-    pivot_longer(cols = -gene, names_to = "sample", values_to = "abundance") %>%
-    group_by(sample) %>%
-    summarise(shannon_diversity = vegan::diversity(abundance, index = "shannon"), .groups = "drop") %>%
+# --- Hutchinson's t-test Implementation ---
+
+if (nrow(diversity_summary_df) == 2) {
+  # Extract values for each group
+  group1_H <- diversity_summary_df$H[1]
+  group1_Var_H <- diversity_summary_df$Var_H[1]
+  group1_N <- diversity_summary_df$N[1]
+  
+  group2_H <- diversity_summary_df$H[2]
+  group2_Var_H <- diversity_summary_df$Var_H[2]
+  group2_N <- diversity_summary_df$N[2]
+  
+  # Calculate the t-statistic
+  t_statistic <- (group1_H - group2_H) / sqrt(group1_Var_H + group2_Var_H)
+  
+  # Calculate the degrees of freedom
+  numerator_df <- (group1_Var_H + group2_Var_H)^2
+  denominator_df <- ((group1_Var_H^2) / group1_N) + ((group2_Var_H^2) / group2_N)
+  degrees_of_freedom <- numerator_df / denominator_df
+  
+  # Calculate the two-tailed p-value
+  p_value <- 2 * pt(-abs(t_statistic), df = degrees_of_freedom)
+} else {
+  warning("Skipping t-test and plot generation because the number of groups is not equal to 2.")
+  p_value <- NA # Set p_value to NA if test is not run
+}
+
+# Proceed with plotting only if the t-test was performed
+if (!is.na(p_value)) {
+  
+  
+  plot_data <- diversity_summary_df %>%
     mutate(
-      condition_group = str_extract(sample, regex$condition_group),
-      time_h_calc = extract_time(sample, regex, time_map)
-    ) %>%
-    dplyr::filter(time_h_calc == !!time_h)
-  print(sdi_replicates)
-  if (nrow(sdi_replicates) < 2 | n_distinct(sdi_replicates$condition_group) < 2) {
-    warning(paste("Not enough data or groups for", gene_name, "at time", time_h, "h to perform a comparison."))
-    return(ggplot() +
-      theme_void() +
-      labs(title = "Not enough data for comparison"))
-  }
-
-
-  stat_test <- t.test(shannon_diversity ~ condition_group, data = sdi_replicates)
-  p_value <- stat_test$p.value
-
-
-  p_label <- ifelse(p_value < 0.001, "p < 0.001", paste("p =", round(p_value, 3)))
-
-
-
-  summary_stats <- sdi_replicates %>%
-    group_by(condition_group) %>%
-    summarise(
-      mean_H = mean(shannon_diversity),
-      sd_H = sd(shannon_diversity),
-      n = n(),
-      sem_H = sd_H / sqrt(n),
-      .groups = "drop"
+      CI_width = sqrt(Var_H),
+      ymin = H - CI_width,
+      ymax = H + CI_width
     )
+  
+  # Prepare labels and positions for the plot
+  p_label <- ifelse(p_value < 0.001, "p < 0.001", paste("p =", round(p_value, 3)))
+  y_position <- max(plot_data$ymax) * 1.1
 
+  # Define the significance bracket coordinates
+  significance_bracket <- tibble(
+    x = c(1, 1, 2, 2),
+    y = c(y_position, y_position * 1.02, y_position * 1.02, y_position)
+  )
 
-  y_position <- max(summary_stats$mean_H + summary_stats$sem_H) * 1.1
-
-
-
+  # General plot theme and labels
   plot_labs <- labs(
-    subtitle = paste("t-test:", p_label),
+    title = paste("Shannon Diversity of", gene_name, "at", time_h, "h"),
+    subtitle = paste("Hutchinson's t-test:", p_label),
     x = "Condition",
     y = "Shannon Index, H"
   )
@@ -513,40 +571,43 @@ plot_diversity_comparison <- function(tair_code, gene_name, time_h, raw_df, data
       plot.subtitle = element_text(hjust = 0.5, size = 12)
     )
 
-
-  significance_bracket <- tibble(
-    x = c(1, 1, 2, 2),
-    y = c(y_position, y_position * 1.02, y_position * 1.02, y_position)
-  )
-
-
-  p_bar <- ggplot(summary_stats, aes(x = condition_group, y = mean_H, fill = condition_group)) +
+  # Create the bar plot
+  p_bar <- ggplot(plot_data, aes(x = condition_group, y = H, fill = condition_group)) +
     geom_bar(stat = "identity", color = "black", alpha = 0.6) +
-    geom_errorbar(aes(ymin = mean_H - sem_H, ymax = mean_H + sem_H), width = 0.2, linewidth = 0.7) +
-    geom_line(data = significance_bracket, aes(x = x, y = y), inherit.aes = FALSE) + # Significance bracket
+    geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.2, linewidth = 0.7) +
+    geom_line(data = significance_bracket, aes(x = x, y = y), inherit.aes = FALSE) +
     annotate("text", x = 1.5, y = y_position * 1.05, label = p_label, size = 4.5) +
     scale_x_discrete(labels = aesthetics$labels) +
     scale_fill_manual(values = aesthetics$values, guide = "none") +
-    labs(title = paste("Shannon Diversity of", gene_name, "at", time_h, "h")) +
+    plot_labs +
     plot_theme
 
-
-  p_point <- ggplot(summary_stats, aes(x = condition_group, y = mean_H, color = condition_group)) +
+  # Create the point plot
+  p_point <- ggplot(plot_data, aes(x = condition_group, y = H, color = condition_group)) +
     geom_point(size = 4, shape = 18) +
-    geom_errorbar(aes(ymin = mean_H - sem_H, ymax = mean_H + sem_H), width = 0.1, linewidth = 0.7) +
-    geom_line(data = significance_bracket, aes(x = x, y = y), inherit.aes = FALSE) + # Significance bracket
+    geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.1, linewidth = 0.7) +
+    geom_line(data = significance_bracket, aes(x = x, y = y), inherit.aes = FALSE) +
     annotate("text", x = 1.5, y = y_position * 1.05, label = p_label, size = 4.5) +
     scale_x_discrete(labels = aesthetics$labels) +
     scale_color_manual(values = aesthetics$values, guide = "none") +
-    labs(title = paste("Shannon Diversity of", gene_name, "at", time_h, "h")) +
+    plot_labs +
     plot_theme
 
-
+  # Combine the plots using patchwork
   combined_plot <- p_bar + p_point
+  
+  # Create directory if it doesn't exist
+  if (!dir.exists(figures_dir)) {
+    dir.create(figures_dir, recursive = TRUE)
+  }
 
-  output_filename <- file.path(figures_dir, paste0("SdComparisom_", gene_name, "_", time_h, "_", toupper(dataset), ".svg"))
+  # Save the combined plot
+  output_filename <- file.path(figures_dir, paste0("SdComparison_", gene_name, "_", time_h, "_", toupper(dataset), ".svg"))
   ggsave(plot = combined_plot, filename = output_filename, width = 8, height = 8)
   cat(paste("SdComparison saved as", output_filename, "\n"))
-
-  return(combined_plot)
+  
+  
 }
+return(combined_plot)
+}
+
