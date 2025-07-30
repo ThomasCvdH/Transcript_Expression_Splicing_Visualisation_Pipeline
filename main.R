@@ -2,7 +2,7 @@
 # Install required packages if not already installed
 required_packages <- c(
   "dplyr", "tidyr", "stringr", "ggplot2", "tibble",
-  "ggtranscript", "rtracklayer", "patchwork", "svglite", "vegan"
+  "ggtranscript", "rtracklayer", "patchwork", "svglite", "vegan", "ecolTest"
 )
 new_packages <- required_packages[!(required_packages %in% installed.packages()[, "Package"])]
 if (length(new_packages)) install.packages(new_packages)
@@ -18,12 +18,13 @@ library(ggtranscript)
 library(rtracklayer)
 library(patchwork)
 library(svglite)
+library(ecolTest)
 
 # --- Load Custom Functions ---
 source("functions.R")
 
 # --- 1. Set Dataset Context ---
-dataset <- "coolLL2" # Options: "adam", "coolLL2", "timeseries"
+dataset <- "timeseries" # Options: "adam", "coolLL2", "timeseries"
 
 # --- 2. Set up output directory for figures ---
 figures_dir <- file.path("figures", dataset)
@@ -57,11 +58,21 @@ rve2_dashboard <- plot_expression_dashboard(
 )
 print(rve2_dashboard)
 
+rve8_dashboard <- plot_expression_dashboard(
+  gene_id = "AT3G09600",
+  gene_name = "RVE8",
+  gtf_data = gtf_df,
+  raw_df = df,
+  avg_df = averaged_df,
+  dataset = dataset
+)
+print(rve8_dashboard)
+
 # Generate and print a shannon diversity comparison for a single gene
 comparison_plot <- plot_diversity_comparison(
-  tair_code = "AT5G37260",
-  gene_name = "RVE2",
-  time_h = 16,
+  tair_code = "AT3G09600",
+  gene_name = "RVE8",
+  time_h = 72,
   raw_df = df,
   dataset = dataset # Does not work with timeseries dataset
 )
@@ -108,7 +119,8 @@ genes_to_plot <- tibble::tribble(
   "PIF5", "AT3G59060",
   "TCP2", "AT3G27010",
   "TCP21", "AT5G08330",
-  "TCP22", "AT1G72010"
+  "TCP22", "AT1G72010",
+  "PHYB", "AT2G18790"
 )
 # Dashboard batch
 for (i in 1:nrow(genes_to_plot)) {
@@ -128,11 +140,40 @@ for (i in 1:nrow(genes_to_plot)) {
       )
     },
     error = function(e) {
-      cat(paste("Could not generate dashboard for", current_gene_name, ":", e$message, "\n\n"))
+      cat(paste(
+        "Could not generate dashboard for",
+        current_gene_name, ":",
+        e$message, "\n\n"
+      ))
     }
   )
 }
 
+# SD compare batch plot
+for (i in 1:nrow(genes_to_plot)) {
+  current_gene_name <- genes_to_plot$gene_name[i]
+  current_gene_id <- str_trim(genes_to_plot$tair_code[i])
+
+  tryCatch(
+    {
+      cat(paste("--- Generating SD comparison for", current_gene_name, "---\n"))
+      comparison_plot <- plot_diversity_comparison(
+        tair_code = current_gene_id,
+        gene_name = current_gene_name,
+        time_h = 16,
+        raw_df = df,
+        dataset = dataset # Does not work with timeseries dataset
+      )
+    },
+    error = function(e) {
+      cat(paste(
+        "Could not generate SD comparison plot for",
+        current_gene_name, ":",
+        e$message, "\n\n"
+      ))
+    }
+  )
+}
 # Grid in batch by family
 # --- RVE Gene Family ---
 rve_genes <- genes_to_plot %>% filter(str_starts(gene_name, "RVE"))
