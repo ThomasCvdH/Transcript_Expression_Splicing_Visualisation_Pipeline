@@ -2,7 +2,7 @@
 # Install required packages if not already installed
 required_packages <- c(
   "dplyr", "tidyr", "stringr", "ggplot2", "tibble",
-  "ggtranscript", "rtracklayer", "patchwork", "svglite", "vegan", "ecolTest"
+  "ggtranscript", "rtracklayer", "patchwork", "svglite"
 )
 new_packages <- required_packages[!(required_packages %in% installed.packages()[, "Package"])]
 if (length(new_packages)) install.packages(new_packages)
@@ -17,8 +17,6 @@ remotes::install_github("dzhang32/ggtranscript")
 library(ggtranscript)
 library(rtracklayer)
 library(patchwork)
-library(svglite)
-library(ecolTest)
 
 # --- Load Custom Functions ---
 source("functions.R")
