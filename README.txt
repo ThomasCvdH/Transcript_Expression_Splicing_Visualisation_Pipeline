@@ -10,7 +10,7 @@ Project: name still TODO
 
 --- Description ---
 
-This R script provides a comprehensive framework for processing, analyzing, and visualizing time-course gene expression data (in Transcripts Per Million, TPM) alongside gene structural information. It is designed to be modular and can handle multiple different datasets through a simple configuration switch at the top of the script.
+This R pipeline provides a comprehensive framework for processing, analyzing, and visualizing time-course gene expression data (in Transcripts Per Million, TPM) alongside gene structural information. It is designed to be modular and can handle multiple different datasets through a simple configuration switch at the top of the script.
 
 
 --- Requirements ---
