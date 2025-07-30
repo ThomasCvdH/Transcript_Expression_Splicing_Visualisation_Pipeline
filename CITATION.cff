@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Transcript_Expression_Splicing_Visualisation_Pipeline
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Thomas Cornelius
+    family-names: van der Hoven
+    email: thomasvanderhoven@gmail.com
+    orcid: 'https://orcid.org/0009-0006-1061-1173'
+repository-code: >-
+  https://github.com/ThomasCvdH/Transcript_Expression_Splicing_Visualisation_Pipeline
+abstract: >-
+  This R pipeline provides a comprehensive framework for
+  processing, analyzing, and visualizing time-course gene
+  expression data (in Transcripts Per Million, TPM)
+  alongside gene structural information. It is designed to
+  be modular and can handle multiple different datasets
+  through a simple configuration switch at the top of the
+  script
+license: GPL-3.0
