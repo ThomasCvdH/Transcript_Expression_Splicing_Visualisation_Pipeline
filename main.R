@@ -4,7 +4,9 @@ required_packages <- c(
   "dplyr", "tidyr", "stringr", "ggplot2", "tibble",
   "ggtranscript", "rtracklayer", "patchwork", "svglite"
 )
-new_packages <- required_packages[!(required_packages %in% installed.packages()[, "Package"])]
+new_packages <- required_packages[!(
+  required_packages %in% installed.packages()[, "Package"]
+)]
 if (length(new_packages)) install.packages(new_packages)
 
 library(dplyr)
@@ -12,14 +14,17 @@ library(tidyr)
 library(stringr)
 library(ggplot2)
 library(tibble)
-library(vegan)
-remotes::install_github("dzhang32/ggtranscript")
 library(ggtranscript)
 library(rtracklayer)
 library(patchwork)
+remotes::install_github("dzhang32/ggtranscript")
 
 # --- Load Custom Functions ---
 source("functions.R")
+
+# --- GTF Import
+gtf_path <- file.path("ALL_combined_annotations.gtf")
+gtf_df <- rtracklayer::import(gtf_path) %>% as_tibble()
 
 # --- 1. Set Dataset Context ---
 dataset <- "timeseries" # Options: "adam", "coolLL2", "timeseries"
@@ -38,12 +43,10 @@ data_list <- switch(dataset,
 df <- data_list$df
 averaged_df <- data_list$averaged_df
 print(averaged_df)
-# --- 4. GTF Import (shared) ---
-gtf_path <- file.path("ALL_combined_annotations.gtf")
-gtf_df <- rtracklayer::import(gtf_path) %>% as_tibble()
 
 
-# --- 5. Usage Examples ---
+
+# --- 4. Usage Examples ---
 
 # Generate and print a dashboard for a single gene
 rve2_dashboard <- plot_expression_dashboard(
