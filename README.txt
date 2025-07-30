@@ -4,10 +4,9 @@ Project: name still TODO
 
 --- TODO ---
 
-- Filter top transcripts and associated by proportion.
 - Implement timeseries overlap line plot.
 - Fix SDI comparison for timeseries.
-- ?Error bars for top 3 transcripts plot?
+- ?Error bars for top 10% transcripts plot?
 
 --- Description ---
 
@@ -27,7 +26,6 @@ The script will automatically attempt to install any missing packages. The requi
 - stringr
 - ggplot2
 - tibble
-- vegan
 - ggtranscript
 - rtracklayer
 - patchwork
@@ -78,6 +76,6 @@ For example, if dataset <- "coolLL2", all plots will be saved in:
 
 --- Customization ---
 
-Analyzing Different Genes
+Analysing Different Genes
 Change the gene_name and tair_code in the objects that call the plotting functions
 To change the list of genes processed in the batch loop or in the gene family grids, change the tibble objects (genes_to_plot, rve_genes, prr_genes).
